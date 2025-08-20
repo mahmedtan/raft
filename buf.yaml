@@ -1,0 +1,7 @@
+version: v2
+lint:
+  except:
+    - PACKAGE_VERSION_SUFFIX)
+
+modules:
+  - path: .
