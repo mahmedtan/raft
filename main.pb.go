@@ -229,8 +229,8 @@ const file_main_proto_rawDesc = "" +
 	"logEntries\"8\n" +
 	"\bLogEntry\x12\x12\n" +
 	"\x04term\x18\x01 \x01(\x03R\x04term\x12\x18\n" +
-	"\acommand\x18\x03 \x01(\tR\acommand2Q\n" +
-	"\vRaftService\x12B\n" +
+	"\acommand\x18\x03 \x01(\tR\acommand2J\n" +
+	"\x04Raft\x12B\n" +
 	"\vRequestVote\x12\x18.raft.RequestVoteRequest\x1a\x19.raft.RequestVoteResponseB Z\x1egithub.com/mahmedtan/raft/mainb\beditionsp\xe8\a"
 
 var (
@@ -254,8 +254,8 @@ var file_main_proto_goTypes = []any{
 }
 var file_main_proto_depIdxs = []int32{
 	3, // 0: raft.PersistentState.log_entries:type_name -> raft.LogEntry
-	0, // 1: raft.RaftService.RequestVote:input_type -> raft.RequestVoteRequest
-	1, // 2: raft.RaftService.RequestVote:output_type -> raft.RequestVoteResponse
+	0, // 1: raft.Raft.RequestVote:input_type -> raft.RequestVoteRequest
+	1, // 2: raft.Raft.RequestVote:output_type -> raft.RequestVoteResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
