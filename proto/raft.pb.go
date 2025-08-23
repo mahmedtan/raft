@@ -23,10 +23,10 @@ const (
 
 type RequestVoteRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	CandidateId   *int64                 `protobuf:"varint,2,opt,name=candidate_id,json=candidateId" json:"candidate_id,omitempty"` // The ID of the candidate requesting the vote
-	CurrentTerm   *int64                 `protobuf:"varint,1,opt,name=current_term,json=currentTerm" json:"current_term,omitempty"` // The term of the candidate requesting the vote
-	LogLength     *int64                 `protobuf:"varint,3,opt,name=log_length,json=logLength" json:"log_length,omitempty"`       // The length of the candidate's log
-	LastTerm      *int64                 `protobuf:"varint,4,opt,name=last_term,json=lastTerm" json:"last_term,omitempty"`          // The term of the last entry in the candidate's log
+	Term          *int64                 `protobuf:"varint,1,opt,name=term" json:"term,omitempty"`
+	CandidateId   *int64                 `protobuf:"varint,2,opt,name=candidate_id,json=candidateId" json:"candidate_id,omitempty"`
+	LastLogIndex  *int64                 `protobuf:"varint,3,opt,name=last_log_index,json=lastLogIndex" json:"last_log_index,omitempty"`
+	LastLogTerm   *int64                 `protobuf:"varint,4,opt,name=last_log_term,json=lastLogTerm" json:"last_log_term,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -61,6 +61,13 @@ func (*RequestVoteRequest) Descriptor() ([]byte, []int) {
 	return file_raft_proto_rawDescGZIP(), []int{0}
 }
 
+func (x *RequestVoteRequest) GetTerm() int64 {
+	if x != nil && x.Term != nil {
+		return *x.Term
+	}
+	return 0
+}
+
 func (x *RequestVoteRequest) GetCandidateId() int64 {
 	if x != nil && x.CandidateId != nil {
 		return *x.CandidateId
@@ -68,32 +75,24 @@ func (x *RequestVoteRequest) GetCandidateId() int64 {
 	return 0
 }
 
-func (x *RequestVoteRequest) GetCurrentTerm() int64 {
-	if x != nil && x.CurrentTerm != nil {
-		return *x.CurrentTerm
+func (x *RequestVoteRequest) GetLastLogIndex() int64 {
+	if x != nil && x.LastLogIndex != nil {
+		return *x.LastLogIndex
 	}
 	return 0
 }
 
-func (x *RequestVoteRequest) GetLogLength() int64 {
-	if x != nil && x.LogLength != nil {
-		return *x.LogLength
-	}
-	return 0
-}
-
-func (x *RequestVoteRequest) GetLastTerm() int64 {
-	if x != nil && x.LastTerm != nil {
-		return *x.LastTerm
+func (x *RequestVoteRequest) GetLastLogTerm() int64 {
+	if x != nil && x.LastLogTerm != nil {
+		return *x.LastLogTerm
 	}
 	return 0
 }
 
 type RequestVoteResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeId        *int64                 `protobuf:"varint,2,opt,name=node_id,json=nodeId" json:"node_id,omitempty"`                // The ID of the node responding to the vote request
-	CurrentTerm   *int64                 `protobuf:"varint,1,opt,name=current_term,json=currentTerm" json:"current_term,omitempty"` // The current term of the node responding
-	VoteGranted   *bool                  `protobuf:"varint,3,opt,name=vote_granted,json=voteGranted" json:"vote_granted,omitempty"` // Whether the vote was granted or not
+	Term          *int64                 `protobuf:"varint,1,opt,name=term" json:"term,omitempty"`
+	VoteGranted   *bool                  `protobuf:"varint,2,opt,name=vote_granted,json=voteGranted" json:"vote_granted,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -128,16 +127,9 @@ func (*RequestVoteResponse) Descriptor() ([]byte, []int) {
 	return file_raft_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *RequestVoteResponse) GetNodeId() int64 {
-	if x != nil && x.NodeId != nil {
-		return *x.NodeId
-	}
-	return 0
-}
-
-func (x *RequestVoteResponse) GetCurrentTerm() int64 {
-	if x != nil && x.CurrentTerm != nil {
-		return *x.CurrentTerm
+func (x *RequestVoteResponse) GetTerm() int64 {
+	if x != nil && x.Term != nil {
+		return *x.Term
 	}
 	return 0
 }
@@ -149,19 +141,155 @@ func (x *RequestVoteResponse) GetVoteGranted() bool {
 	return false
 }
 
+type AppendEntriesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Term          *int64                 `protobuf:"varint,1,opt,name=term" json:"term,omitempty"`
+	LeaderId      *int64                 `protobuf:"varint,2,opt,name=leader_id,json=leaderId" json:"leader_id,omitempty"`
+	PrevLogIndex  *int64                 `protobuf:"varint,3,opt,name=prev_log_index,json=prevLogIndex" json:"prev_log_index,omitempty"`
+	PrevLogTerm   *int64                 `protobuf:"varint,4,opt,name=prev_log_term,json=prevLogTerm" json:"prev_log_term,omitempty"`
+	Entries       []*LogEntry            `protobuf:"bytes,6,rep,name=entries" json:"entries,omitempty"`
+	LeaderCommit  *int64                 `protobuf:"varint,5,opt,name=leader_commit,json=leaderCommit" json:"leader_commit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppendEntriesRequest) Reset() {
+	*x = AppendEntriesRequest{}
+	mi := &file_raft_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppendEntriesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppendEntriesRequest) ProtoMessage() {}
+
+func (x *AppendEntriesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_raft_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppendEntriesRequest.ProtoReflect.Descriptor instead.
+func (*AppendEntriesRequest) Descriptor() ([]byte, []int) {
+	return file_raft_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AppendEntriesRequest) GetTerm() int64 {
+	if x != nil && x.Term != nil {
+		return *x.Term
+	}
+	return 0
+}
+
+func (x *AppendEntriesRequest) GetLeaderId() int64 {
+	if x != nil && x.LeaderId != nil {
+		return *x.LeaderId
+	}
+	return 0
+}
+
+func (x *AppendEntriesRequest) GetPrevLogIndex() int64 {
+	if x != nil && x.PrevLogIndex != nil {
+		return *x.PrevLogIndex
+	}
+	return 0
+}
+
+func (x *AppendEntriesRequest) GetPrevLogTerm() int64 {
+	if x != nil && x.PrevLogTerm != nil {
+		return *x.PrevLogTerm
+	}
+	return 0
+}
+
+func (x *AppendEntriesRequest) GetEntries() []*LogEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *AppendEntriesRequest) GetLeaderCommit() int64 {
+	if x != nil && x.LeaderCommit != nil {
+		return *x.LeaderCommit
+	}
+	return 0
+}
+
+type AppendEntriesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Term          *int64                 `protobuf:"varint,1,opt,name=term" json:"term,omitempty"`
+	Success       *bool                  `protobuf:"varint,2,opt,name=success" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AppendEntriesResponse) Reset() {
+	*x = AppendEntriesResponse{}
+	mi := &file_raft_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AppendEntriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AppendEntriesResponse) ProtoMessage() {}
+
+func (x *AppendEntriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_raft_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AppendEntriesResponse.ProtoReflect.Descriptor instead.
+func (*AppendEntriesResponse) Descriptor() ([]byte, []int) {
+	return file_raft_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *AppendEntriesResponse) GetTerm() int64 {
+	if x != nil && x.Term != nil {
+		return *x.Term
+	}
+	return 0
+}
+
+func (x *AppendEntriesResponse) GetSuccess() bool {
+	if x != nil && x.Success != nil {
+		return *x.Success
+	}
+	return false
+}
+
 type PersistentState struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NodeId        *int64                 `protobuf:"varint,2,opt,name=node_id,json=nodeId" json:"node_id,omitempty"`
-	Term          *int64                 `protobuf:"varint,1,opt,name=term" json:"term,omitempty"`
+	CurrentTerm   *int64                 `protobuf:"varint,1,opt,name=current_term,json=currentTerm" json:"current_term,omitempty"`
 	VotedFor      *int64                 `protobuf:"varint,3,opt,name=voted_for,json=votedFor" json:"voted_for,omitempty"`
-	LogEntries    []*LogEntry            `protobuf:"bytes,4,rep,name=log_entries,json=logEntries" json:"log_entries,omitempty"`
+	Log           []*LogEntry            `protobuf:"bytes,4,rep,name=log" json:"log,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PersistentState) Reset() {
 	*x = PersistentState{}
-	mi := &file_raft_proto_msgTypes[2]
+	mi := &file_raft_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -173,7 +301,7 @@ func (x *PersistentState) String() string {
 func (*PersistentState) ProtoMessage() {}
 
 func (x *PersistentState) ProtoReflect() protoreflect.Message {
-	mi := &file_raft_proto_msgTypes[2]
+	mi := &file_raft_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -186,7 +314,7 @@ func (x *PersistentState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PersistentState.ProtoReflect.Descriptor instead.
 func (*PersistentState) Descriptor() ([]byte, []int) {
-	return file_raft_proto_rawDescGZIP(), []int{2}
+	return file_raft_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PersistentState) GetNodeId() int64 {
@@ -196,9 +324,9 @@ func (x *PersistentState) GetNodeId() int64 {
 	return 0
 }
 
-func (x *PersistentState) GetTerm() int64 {
-	if x != nil && x.Term != nil {
-		return *x.Term
+func (x *PersistentState) GetCurrentTerm() int64 {
+	if x != nil && x.CurrentTerm != nil {
+		return *x.CurrentTerm
 	}
 	return 0
 }
@@ -210,9 +338,9 @@ func (x *PersistentState) GetVotedFor() int64 {
 	return 0
 }
 
-func (x *PersistentState) GetLogEntries() []*LogEntry {
+func (x *PersistentState) GetLog() []*LogEntry {
 	if x != nil {
-		return x.LogEntries
+		return x.Log
 	}
 	return nil
 }
@@ -227,7 +355,7 @@ type LogEntry struct {
 
 func (x *LogEntry) Reset() {
 	*x = LogEntry{}
-	mi := &file_raft_proto_msgTypes[3]
+	mi := &file_raft_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -239,7 +367,7 @@ func (x *LogEntry) String() string {
 func (*LogEntry) ProtoMessage() {}
 
 func (x *LogEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_raft_proto_msgTypes[3]
+	mi := &file_raft_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -252,7 +380,7 @@ func (x *LogEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogEntry.ProtoReflect.Descriptor instead.
 func (*LogEntry) Descriptor() ([]byte, []int) {
-	return file_raft_proto_rawDescGZIP(), []int{3}
+	return file_raft_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *LogEntry) GetTerm() int64 {
@@ -274,28 +402,36 @@ var File_raft_proto protoreflect.FileDescriptor
 const file_raft_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"raft.proto\x12\x04raft\"\x96\x01\n" +
-	"\x12RequestVoteRequest\x12!\n" +
-	"\fcandidate_id\x18\x02 \x01(\x03R\vcandidateId\x12!\n" +
-	"\fcurrent_term\x18\x01 \x01(\x03R\vcurrentTerm\x12\x1d\n" +
-	"\n" +
-	"log_length\x18\x03 \x01(\x03R\tlogLength\x12\x1b\n" +
-	"\tlast_term\x18\x04 \x01(\x03R\blastTerm\"t\n" +
-	"\x13RequestVoteResponse\x12\x17\n" +
-	"\anode_id\x18\x02 \x01(\x03R\x06nodeId\x12!\n" +
-	"\fcurrent_term\x18\x01 \x01(\x03R\vcurrentTerm\x12!\n" +
-	"\fvote_granted\x18\x03 \x01(\bR\vvoteGranted\"\x8c\x01\n" +
-	"\x0fPersistentState\x12\x17\n" +
-	"\anode_id\x18\x02 \x01(\x03R\x06nodeId\x12\x12\n" +
+	"raft.proto\x12\x04raft\"\x95\x01\n" +
+	"\x12RequestVoteRequest\x12\x12\n" +
+	"\x04term\x18\x01 \x01(\x03R\x04term\x12!\n" +
+	"\fcandidate_id\x18\x02 \x01(\x03R\vcandidateId\x12$\n" +
+	"\x0elast_log_index\x18\x03 \x01(\x03R\flastLogIndex\x12\"\n" +
+	"\rlast_log_term\x18\x04 \x01(\x03R\vlastLogTerm\"L\n" +
+	"\x13RequestVoteResponse\x12\x12\n" +
+	"\x04term\x18\x01 \x01(\x03R\x04term\x12!\n" +
+	"\fvote_granted\x18\x02 \x01(\bR\vvoteGranted\"\xe0\x01\n" +
+	"\x14AppendEntriesRequest\x12\x12\n" +
 	"\x04term\x18\x01 \x01(\x03R\x04term\x12\x1b\n" +
-	"\tvoted_for\x18\x03 \x01(\x03R\bvotedFor\x12/\n" +
-	"\vlog_entries\x18\x04 \x03(\v2\x0e.raft.LogEntryR\n" +
-	"logEntries\"8\n" +
+	"\tleader_id\x18\x02 \x01(\x03R\bleaderId\x12$\n" +
+	"\x0eprev_log_index\x18\x03 \x01(\x03R\fprevLogIndex\x12\"\n" +
+	"\rprev_log_term\x18\x04 \x01(\x03R\vprevLogTerm\x12(\n" +
+	"\aentries\x18\x06 \x03(\v2\x0e.raft.LogEntryR\aentries\x12#\n" +
+	"\rleader_commit\x18\x05 \x01(\x03R\fleaderCommit\"E\n" +
+	"\x15AppendEntriesResponse\x12\x12\n" +
+	"\x04term\x18\x01 \x01(\x03R\x04term\x12\x18\n" +
+	"\asuccess\x18\x02 \x01(\bR\asuccess\"\x8c\x01\n" +
+	"\x0fPersistentState\x12\x17\n" +
+	"\anode_id\x18\x02 \x01(\x03R\x06nodeId\x12!\n" +
+	"\fcurrent_term\x18\x01 \x01(\x03R\vcurrentTerm\x12\x1b\n" +
+	"\tvoted_for\x18\x03 \x01(\x03R\bvotedFor\x12 \n" +
+	"\x03log\x18\x04 \x03(\v2\x0e.raft.LogEntryR\x03log\"8\n" +
 	"\bLogEntry\x12\x12\n" +
 	"\x04term\x18\x01 \x01(\x03R\x04term\x12\x18\n" +
-	"\acommand\x18\x03 \x01(\tR\acommand2J\n" +
+	"\acommand\x18\x03 \x01(\tR\acommand2\x94\x01\n" +
 	"\x04Raft\x12B\n" +
-	"\vRequestVote\x12\x18.raft.RequestVoteRequest\x1a\x19.raft.RequestVoteResponseB\"Z github.com/mahmedtan/raft/raftpbb\beditionsp\xe8\a"
+	"\vRequestVote\x12\x18.raft.RequestVoteRequest\x1a\x19.raft.RequestVoteResponse\x12H\n" +
+	"\rAppendEntries\x12\x1a.raft.AppendEntriesRequest\x1a\x1b.raft.AppendEntriesResponseB\"Z github.com/mahmedtan/raft/raftpbb\beditionsp\xe8\a"
 
 var (
 	file_raft_proto_rawDescOnce sync.Once
@@ -309,22 +445,27 @@ func file_raft_proto_rawDescGZIP() []byte {
 	return file_raft_proto_rawDescData
 }
 
-var file_raft_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_raft_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_raft_proto_goTypes = []any{
-	(*RequestVoteRequest)(nil),  // 0: raft.RequestVoteRequest
-	(*RequestVoteResponse)(nil), // 1: raft.RequestVoteResponse
-	(*PersistentState)(nil),     // 2: raft.PersistentState
-	(*LogEntry)(nil),            // 3: raft.LogEntry
+	(*RequestVoteRequest)(nil),    // 0: raft.RequestVoteRequest
+	(*RequestVoteResponse)(nil),   // 1: raft.RequestVoteResponse
+	(*AppendEntriesRequest)(nil),  // 2: raft.AppendEntriesRequest
+	(*AppendEntriesResponse)(nil), // 3: raft.AppendEntriesResponse
+	(*PersistentState)(nil),       // 4: raft.PersistentState
+	(*LogEntry)(nil),              // 5: raft.LogEntry
 }
 var file_raft_proto_depIdxs = []int32{
-	3, // 0: raft.PersistentState.log_entries:type_name -> raft.LogEntry
-	0, // 1: raft.Raft.RequestVote:input_type -> raft.RequestVoteRequest
-	1, // 2: raft.Raft.RequestVote:output_type -> raft.RequestVoteResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	5, // 0: raft.AppendEntriesRequest.entries:type_name -> raft.LogEntry
+	5, // 1: raft.PersistentState.log:type_name -> raft.LogEntry
+	0, // 2: raft.Raft.RequestVote:input_type -> raft.RequestVoteRequest
+	2, // 3: raft.Raft.AppendEntries:input_type -> raft.AppendEntriesRequest
+	1, // 4: raft.Raft.RequestVote:output_type -> raft.RequestVoteResponse
+	3, // 5: raft.Raft.AppendEntries:output_type -> raft.AppendEntriesResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_raft_proto_init() }
@@ -338,7 +479,7 @@ func file_raft_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_raft_proto_rawDesc), len(file_raft_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

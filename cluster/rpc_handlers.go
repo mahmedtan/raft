@@ -3,6 +3,7 @@ package cluster
 import (
 	context "context"
 	"log"
+	"time"
 
 	raftpb "github.com/mahmedtan/raft/proto"
 	"google.golang.org/protobuf/proto"
@@ -11,67 +12,55 @@ import (
 // RequestVote handles incoming vote requests from other nodes in the cluster.
 func (n *Node) RequestVote(_ context.Context, request *raftpb.RequestVoteRequest) (*raftpb.RequestVoteResponse, error) {
 
-	hasOlderTerm := *request.CurrentTerm < n.persistentState.GetTerm()
-	alreadyVotedForAnotherCandidate := *request.CurrentTerm == *n.persistentState.Term && n.persistentState.VotedFor != nil && *n.persistentState.VotedFor != *request.CandidateId
+	hasOlderTerm := request.GetTerm() < n.persistentState.GetCurrentTerm()
+	alreadyVotedForAnotherCandidate := request.GetTerm() == n.persistentState.GetCurrentTerm() && n.persistentState.VotedFor != nil && n.persistentState.GetVotedFor() != request.GetCandidateId()
 
 	if hasOlderTerm || alreadyVotedForAnotherCandidate {
 
 		return &raftpb.RequestVoteResponse{
 			VoteGranted: proto.Bool(false),
-			CurrentTerm: proto.Int64(n.persistentState.GetTerm()),
+			Term:        n.persistentState.CurrentTerm,
 		}, nil
 	}
 
-	var logTerm int64 = 0
+	n.MaybeBecomeFollower(*request.Term)
 
-	logEntries := n.persistentState.GetLogEntries()
-
-	if len(logEntries) > 0 {
-		logTerm = logEntries[len(logEntries)-1].GetTerm()
-	}
-
-	isLogOkay := *request.LastTerm > logTerm || (*request.LastTerm == logTerm && *request.LogLength >= int64(len(logEntries)))
+	isLogOkay := request.GetLastLogTerm() > n.GetLastLogTerm() || (request.GetLastLogTerm() == n.GetLastLogTerm() && request.GetLastLogIndex() >= n.GetLastLogIndex())
 
 	if isLogOkay {
-		n.persistentState.Term = request.CurrentTerm
 		n.persistentState.VotedFor = request.CandidateId
 		n.SavePersistentState()
+		n.ResetTimer()
 
 		return &raftpb.RequestVoteResponse{
-			NodeId:      proto.Int64(*n.persistentState.NodeId),
 			VoteGranted: proto.Bool(true),
-			CurrentTerm: proto.Int64(n.persistentState.GetTerm()),
+			Term:        n.persistentState.CurrentTerm,
 		}, nil
 
 	} else {
-
 		return &raftpb.RequestVoteResponse{
-			NodeId:      proto.Int64(n.persistentState.GetNodeId()),
 			VoteGranted: proto.Bool(false),
-			CurrentTerm: proto.Int64(n.persistentState.GetTerm()),
+			Term:        n.persistentState.CurrentTerm,
 		}, nil
 	}
 
 }
 
-// StartVoteRequest starts the vote request process for the node to become a leader in the cluster.
-func (node *Node) StartVoteRequest() {
+// AppendEntries handles incoming log replication requests from the leader node.
+func (n *Node) AppendEntries(_ context.Context, request *raftpb.AppendEntriesRequest) (*raftpb.AppendEntriesResponse, error) {
+	return nil, nil
+}
 
-	*node.persistentState.Term++
+// StartElection starts the vote request process for the node to become a leader in the cluster.
+func (node *Node) StartElection() {
 
+	node.IncrementTerm()
 	node.role = Candidate
+	votesRecvd := []int64{node.persistentState.GetNodeId()}
 	node.persistentState.VotedFor = node.persistentState.NodeId
-	node.votesRecvd = []int{int(node.persistentState.GetNodeId())}
 	node.SavePersistentState()
 
-	lastTerm := 0
-
-	logEntries := node.persistentState.GetLogEntries()
-
-	if len(logEntries) > 0 {
-		lastTerm = len(logEntries) - 1
-	}
-	log.Printf("Node %v, Term %v: Starting vote request\n", node.persistentState.GetNodeId(), node.persistentState.GetTerm())
+	log.Printf("Node %v, Term %v: Starting vote request\n", node.persistentState.GetNodeId(), node.persistentState.GetCurrentTerm())
 
 	for _, member := range ClusterMembers {
 
@@ -87,10 +76,10 @@ func (node *Node) StartVoteRequest() {
 		}
 
 		req := &raftpb.RequestVoteRequest{
-			CandidateId: proto.Int64(node.persistentState.GetNodeId()),
-			CurrentTerm: proto.Int64(node.persistentState.GetTerm()),
-			LogLength:   proto.Int64(int64(len(logEntries))),
-			LastTerm:    proto.Int64(int64(lastTerm)),
+			CandidateId:  proto.Int64(node.persistentState.GetNodeId()),
+			Term:         node.persistentState.CurrentTerm,
+			LastLogTerm:  proto.Int64(node.GetLastLogTerm()),
+			LastLogIndex: proto.Int64(node.GetLastLogIndex()),
 		}
 
 		reply, err := raftClient.RequestVote(context.Background(), req)
@@ -100,36 +89,29 @@ func (node *Node) StartVoteRequest() {
 			continue
 		}
 
-		if *reply.CurrentTerm > *node.persistentState.Term {
-			log.Printf("Node %v, Term %v: Received higher term %v from Node %v, updating current term and resetting role\n", node.persistentState.GetNodeId(), node.persistentState.GetTerm(), *reply.CurrentTerm, member)
+		node.MaybeBecomeFollower(*reply.Term)
 
-			node.persistentState.Term = reply.CurrentTerm
-			node.persistentState.VotedFor = nil
+		if node.role == Candidate && *reply.VoteGranted == true && *node.persistentState.CurrentTerm == *reply.Term {
 
-			node.role = Follower
-			node.votesRecvd = make([]int, 0)
+			votesRecvd = append(votesRecvd, int64(member))
 
-			node.SavePersistentState()
-			node.ResetTimer()
+			log.Printf("Node %v, Term %v: Received vote from Node %v, total votes: %d\n", node.persistentState.GetNodeId(), node.persistentState.GetCurrentTerm(), member, len(votesRecvd))
 
-			return
-		} else if node.role == Candidate && *reply.VoteGranted == true && node.persistentState.GetTerm() == *reply.CurrentTerm {
-			log.Printf("Node %v, Term %v: Received vote from Node %v, total votes: %d\n", node.persistentState.GetNodeId(), node.persistentState.GetTerm(), member, len(node.votesRecvd))
-
-			node.votesRecvd = append(node.votesRecvd, int(*reply.NodeId))
-
-			if len(node.votesRecvd) > len(ClusterMembers)/2 {
-				log.Printf("Node %v, Term %v: Received majority votes, becoming leader\n", node.persistentState.GetNodeId(), node.persistentState.GetTerm())
+			if len(votesRecvd) > (len(ClusterMembers) / 2) {
+				log.Printf("Node %v, Term %v: Received majority votes, becoming leader\n", node.persistentState.GetNodeId(), node.persistentState.GetCurrentTerm())
 				node.role = Leader
 				node.leaderId = int(node.persistentState.GetNodeId())
 				node.ResetTimer()
 
-				for _, member := range ClusterMembers {
+				// go node.StartHeartbeat()
 
-					node.ackLen[member] = 0
-					node.sentLen[member] = len(node.persistentState.GetLogEntries())
-					node.ReplicateLog()
+				for _, member := range ClusterMembers {
+					node.nextIndex[member] = len(node.persistentState.Log)
+					node.matchIndex[member] = 0
 				}
+
+				node.ReplicateLog()
+
 			}
 		}
 
@@ -138,5 +120,28 @@ func (node *Node) StartVoteRequest() {
 }
 
 func (n *Node) ReplicateLog() {
-	log.Printf("Node %v, Term %v: Replicating log entries to followers\n", n.persistentState.GetNodeId(), n.persistentState.GetTerm())
+	log.Printf("Node %v, Term %v: Replicating log entries to followers\n", n.persistentState.GetNodeId(), n.persistentState.GetCurrentTerm())
+}
+
+func (n *Node) StartHeartbeat() {
+
+	n.heartbeatTicker = time.NewTicker(HeartbeatInterval)
+
+	log.Printf("Node %v, Term %v: Starting heartbeat\n", n.persistentState.GetNodeId(), n.persistentState.GetCurrentTerm())
+	for n.role == Leader {
+		<-n.heartbeatTicker.C
+
+		for _, member := range ClusterMembers {
+
+			if member == int(n.persistentState.GetNodeId()) {
+				continue
+			}
+
+			n.ReplicateLog()
+		}
+	}
+
+	log.Printf("Node %v, Term %v: Stopping heartbeat\n", n.persistentState.GetNodeId(), n.persistentState.GetCurrentTerm())
+
+	n.heartbeatTicker.Stop()
 }

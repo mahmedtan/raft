@@ -2,6 +2,8 @@ version: v2
 lint:
   except:
     - PACKAGE_VERSION_SUFFIX
+    - PACKAGE_DIRECTORY_MATCH
+    - SERVICE_SUFFIX
 
 modules:
   - path: .

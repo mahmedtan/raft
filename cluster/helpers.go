@@ -23,9 +23,14 @@ func getRaftClientForNodeId(id int) (raftpb.RaftClient, error) {
 func getPersistentStateFileName(id int) string {
 	return fmt.Sprintf("state/persistent_state_%d.pb", id)
 }
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 func getRandomTimeout() time.Duration {
-	return time.Duration(rand.Intn(5000)) * time.Millisecond
+	base := 1500 * time.Millisecond
+	jitter := time.Duration(rand.Intn(1500)) * time.Millisecond // 1.5s–3.0s
+	return base + jitter
 }
 
 func getPortForNodeId(id int) int {
@@ -43,3 +48,5 @@ func logError(err error) {
 }
 
 var ClusterMembers = [...]int{1, 2, 3, 4, 5}
+
+var HeartbeatInterval = 2 * time.Second

@@ -34,38 +34,75 @@ func (s NodeRole) String() string {
 }
 
 type Node struct {
-	role NodeRole
-
-	votesRecvd []int
-
+	role     NodeRole
 	leaderId int
-	timer    *time.Timer
 
-	commitLen int
+	timer           *time.Timer
+	heartbeatTicker *time.Ticker
 
-	sentLen []int
-	ackLen  []int
-
+	commitLen       int
+	nextIndex       []int
+	matchIndex      []int
 	persistentState *raftpb.PersistentState
+
 	raftpb.UnimplementedRaftServer
+}
+
+func (n *Node) IncrementTerm() {
+	*n.persistentState.CurrentTerm = n.persistentState.GetCurrentTerm() + 1
+
+}
+
+func (n *Node) MaybeBecomeFollower(term int64) {
+	if term > n.persistentState.GetCurrentTerm() {
+		log.Printf("Node %d: Term out of date. CurrentTerm=%d, NewTerm=%d. Becoming Follower.",
+			n.persistentState.GetNodeId(),
+			n.persistentState.GetCurrentTerm(),
+			term)
+		*n.persistentState.CurrentTerm = term
+		n.persistentState.VotedFor = nil
+		n.role = Follower
+		n.SavePersistentState()
+		n.ResetTimer()
+	}
+
+}
+
+func (n *Node) GetLastLogIndex() int64 {
+
+	logEntries := n.persistentState.GetLog()
+
+	if len(logEntries) == 0 {
+		return 0
+	}
+
+	return int64(len(n.persistentState.GetLog()) - 1)
+}
+
+func (n *Node) GetLastLogTerm() int64 {
+	logEntries := n.persistentState.GetLog()
+	if len(logEntries) == 0 {
+		return 0
+	}
+
+	return logEntries[len(logEntries)-1].GetTerm()
 }
 
 func StartNode(id int) {
 	node := &Node{
-		role:       Follower,
-		leaderId:   0,
-		votesRecvd: make([]int, 0),
-		timer:      time.NewTimer(getRandomTimeout()),
+		role:     Follower,
+		leaderId: 0,
+		timer:    time.NewTimer(getRandomTimeout()),
 
-		commitLen: 0,
-		sentLen:   make([]int, len(ClusterMembers)+1),
-		ackLen:    make([]int, len(ClusterMembers)+1),
+		commitLen:  0,
+		nextIndex:  make([]int, len(ClusterMembers)+1),
+		matchIndex: make([]int, len(ClusterMembers)+1),
 
 		persistentState: &raftpb.PersistentState{
-			NodeId:     proto.Int64(int64(id)),
-			Term:       proto.Int64(0),
-			VotedFor:   nil,
-			LogEntries: make([]*raftpb.LogEntry, 0),
+			NodeId:      proto.Int64(int64(id)),
+			CurrentTerm: proto.Int64(0),
+			VotedFor:    nil,
+			Log:         []*raftpb.LogEntry{},
 		},
 	}
 
@@ -82,9 +119,9 @@ func StartNode(id int) {
 
 	log.Printf("Node %d: Loaded state: Term=%d, VotedFor=%v, LogEntries=%d",
 		id,
-		node.persistentState.GetTerm(),
+		node.persistentState.GetCurrentTerm(),
 		node.persistentState.GetVotedFor(),
-		len(node.persistentState.GetLogEntries()))
+		len(node.persistentState.GetLog()))
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", getPortForNodeId(id)))
 	if err != nil {
@@ -95,7 +132,12 @@ func StartNode(id int) {
 		for {
 			<-node.timer.C
 
-			node.StartVoteRequest()
+			if node.role == Leader {
+				node.ResetTimer()
+				continue
+			}
+
+			node.StartElection()
 
 			node.ResetTimer()
 		}
