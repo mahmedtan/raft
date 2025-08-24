@@ -39,12 +39,12 @@ type Node struct {
 
 	timer           *time.Timer
 	heartbeatTicker *time.Ticker
+	resetTimerCh    chan struct{}
 
-	commitLen       int
+	commitIndex     int
 	nextIndex       []int
 	matchIndex      []int
 	persistentState *raftpb.PersistentState
-
 	raftpb.UnimplementedRaftServer
 }
 
@@ -54,6 +54,7 @@ func (n *Node) IncrementTerm() {
 }
 
 func (n *Node) MaybeBecomeFollower(term int64) {
+
 	if term > n.persistentState.GetCurrentTerm() {
 		log.Printf("Node %d: Term out of date. CurrentTerm=%d, NewTerm=%d. Becoming Follower.",
 			n.persistentState.GetNodeId(),
@@ -62,7 +63,9 @@ func (n *Node) MaybeBecomeFollower(term int64) {
 		*n.persistentState.CurrentTerm = term
 		n.persistentState.VotedFor = nil
 		n.role = Follower
+		n.leaderId = 0
 		n.SavePersistentState()
+
 		n.ResetTimer()
 	}
 
@@ -73,7 +76,7 @@ func (n *Node) GetLastLogIndex() int64 {
 	logEntries := n.persistentState.GetLog()
 
 	if len(logEntries) == 0 {
-		return 0
+		return -1
 	}
 
 	return int64(len(n.persistentState.GetLog()) - 1)
@@ -90,13 +93,14 @@ func (n *Node) GetLastLogTerm() int64 {
 
 func StartNode(id int) {
 	node := &Node{
-		role:     Follower,
-		leaderId: 0,
-		timer:    time.NewTimer(getRandomTimeout()),
+		role:         Follower,
+		leaderId:     0,
+		timer:        time.NewTimer(getRandomTimeout()),
+		resetTimerCh: make(chan struct{}, 1),
 
-		commitLen:  0,
-		nextIndex:  make([]int, len(ClusterMembers)+1),
-		matchIndex: make([]int, len(ClusterMembers)+1),
+		commitIndex: -1,
+		nextIndex:   make([]int, len(ClusterMembers)+1),
+		matchIndex:  make([]int, len(ClusterMembers)+1),
 
 		persistentState: &raftpb.PersistentState{
 			NodeId:      proto.Int64(int64(id)),
@@ -130,16 +134,29 @@ func StartNode(id int) {
 
 	go func() {
 		for {
-			<-node.timer.C
+			select {
+			case <-node.timer.C:
 
-			if node.role == Leader {
+				log.Printf("Node %v, Term %v: current log: %v", node.persistentState.GetNodeId(), node.persistentState.GetCurrentTerm(), node.persistentState.GetLog())
+
+				if node.role == Leader {
+					node.ResetTimer()
+					continue
+				}
+
+				node.StartElection()
 				node.ResetTimer()
-				continue
+
+			case <-node.resetTimerCh:
+				if !node.timer.Stop() {
+					// Drain if it already fired but not yet read
+					select {
+					case <-node.timer.C:
+					default:
+					}
+				}
+				node.timer.Reset(getRandomTimeout())
 			}
-
-			node.StartElection()
-
-			node.ResetTimer()
 		}
 	}()
 
@@ -147,12 +164,11 @@ func StartNode(id int) {
 }
 
 func (n *Node) ResetTimer() {
-	if n.timer != nil {
-		n.timer.Stop()
+	select {
+	case n.resetTimerCh <- struct{}{}:
+	default:
+		// If channel already has a pending reset, that's fine.
 	}
-
-	log.Printf("Node %v: Timer Reset", n.persistentState.GetNodeId())
-	n.timer = time.NewTimer(getRandomTimeout())
 }
 
 func (n *Node) SavePersistentState() error {

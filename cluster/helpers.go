@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-func getRaftClientForNodeId(id int) (raftpb.RaftClient, error) {
+func GetRaftClientForNodeId(id int) (raftpb.RaftClient, error) {
 	conn, err := grpc.NewClient(fmt.Sprintf("localhost:%d", getPortForNodeId(id)), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to node %d", id)
@@ -28,8 +28,8 @@ func init() {
 }
 
 func getRandomTimeout() time.Duration {
-	base := 1500 * time.Millisecond
-	jitter := time.Duration(rand.Intn(1500)) * time.Millisecond // 1.5s–3.0s
+	base := HeartbeatInterval * 8                              // 1200ms
+	jitter := time.Duration(rand.Intn(800)) * time.Millisecond // 0-400ms
 	return base + jitter
 }
 
@@ -49,4 +49,4 @@ func logError(err error) {
 
 var ClusterMembers = [...]int{1, 2, 3, 4, 5}
 
-var HeartbeatInterval = 2 * time.Second
+var HeartbeatInterval = 100 * time.Millisecond
